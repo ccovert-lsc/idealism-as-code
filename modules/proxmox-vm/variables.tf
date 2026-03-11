@@ -60,6 +60,12 @@ variable "ssh_public_keys" {
   default     = []
 }
 
+variable "data_disk_gb" {
+  description = "Size of optional second data disk in gigabytes (0 = no data disk)"
+  type        = number
+  default     = 0
+}
+
 variable "tags" {
   description = "Proxmox tags to apply"
   type        = list(string)
