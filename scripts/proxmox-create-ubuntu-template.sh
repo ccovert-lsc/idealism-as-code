@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
-# Creates the ubuntu-2404-cloud template (VM 9000) on the local Proxmox node.
+# Creates the ubuntu-2404-cloud template on the local Proxmox node.
 # Run this on EACH node that will host VMs cloned from the template.
 # Requires: root shell on the Proxmox node (web UI → Node → Shell, or SSH as root)
+#
+# VM IDs must be unique across the entire cluster:
+#   pvemain:  bash proxmox-create-ubuntu-template.sh local-lvm 9000  (already done)
+#   pvesub1:  bash proxmox-create-ubuntu-template.sh local-lvm 9001
+#   pvesub2:  bash proxmox-create-ubuntu-template.sh local-lvm 9002
 #
 # Usage: bash proxmox-create-ubuntu-template.sh [storage] [vm-id]
 #   storage  defaults to local-lvm
