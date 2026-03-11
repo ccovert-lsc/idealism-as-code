@@ -1,0 +1,18 @@
+---
+# Example Ansible inventory — real inventory lives in lab-work/ansible/inventory/
+all:
+  children:
+    proxmox:
+      hosts:
+        pve-01:
+          ansible_host: 192.168.x.x
+    k3s_server:
+      hosts:
+        k3s-server-01:
+          ansible_host: 192.168.x.x
+    k3s_agent:
+      hosts:
+        k3s-agent-01:
+          ansible_host: 192.168.x.x
+        k3s-agent-02:
+          ansible_host: 192.168.x.x

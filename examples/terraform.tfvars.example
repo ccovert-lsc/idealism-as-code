@@ -1,0 +1,16 @@
+# Example tfvars — copy to terraform.tfvars and fill in real values
+# Real values live in the private lab-work repo
+
+proxmox_endpoint = "https://your-proxmox-host:8006"
+proxmox_username = "terraform@pve"
+# proxmox_password = set via TF_VAR_proxmox_password or SOPS
+
+nodes = {
+  control-01 = {
+    node     = "pve-01"
+    template = "ubuntu-2404-cloud"
+    cores    = 4
+    memory   = 4096
+    ip       = "dhcp"
+  }
+}

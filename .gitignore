@@ -1,0 +1,16 @@
+# Terraform / OpenTofu
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+terraform.tfvars
+*.auto.tfvars
+
+# Never commit real values
+*.tfvars
+!*.tfvars.example
+
+# OS
+.DS_Store
+Thumbs.db
