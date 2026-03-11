@@ -36,6 +36,10 @@ resource "proxmox_virtual_environment_vm" "this" {
   }
 
   initialization {
+    user_account {
+      keys = var.ssh_public_keys
+    }
+
     ip_config {
       ipv4 {
         address = var.ip_address

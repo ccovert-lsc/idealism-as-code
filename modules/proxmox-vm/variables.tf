@@ -54,6 +54,12 @@ variable "gateway" {
   default     = null
 }
 
+variable "ssh_public_keys" {
+  description = "List of SSH public keys to inject via cloud-init"
+  type        = list(string)
+  default     = []
+}
+
 variable "tags" {
   description = "Proxmox tags to apply"
   type        = list(string)
