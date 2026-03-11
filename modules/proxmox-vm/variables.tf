@@ -42,10 +42,16 @@ variable "network_bridge" {
   default     = "vmbr0"
 }
 
-variable "ip_config" {
-  description = "IP configuration string (e.g. 'ip=192.168.1.10/24,gw=192.168.1.1')"
+variable "ip_address" {
+  description = "IP address in CIDR notation (e.g. '192.168.1.10/24') or 'dhcp'"
   type        = string
-  default     = "ip=dhcp"
+  default     = "dhcp"
+}
+
+variable "gateway" {
+  description = "Default gateway IP (e.g. '192.168.1.1')"
+  type        = string
+  default     = null
 }
 
 variable "tags" {
