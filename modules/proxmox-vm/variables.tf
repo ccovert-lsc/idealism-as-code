@@ -31,9 +31,9 @@ variable "datastore" {
 }
 
 variable "disk_size" {
-  description = "Disk size (e.g. '20G')"
-  type        = string
-  default     = "20G"
+  description = "Disk size in gigabytes"
+  type        = number
+  default     = 20
 }
 
 variable "network_bridge" {
