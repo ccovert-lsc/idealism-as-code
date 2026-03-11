@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # idealism-as-code
 
 Canonical reference architecture patterns for a self-hosted platform lab.
@@ -30,3 +31,6 @@ module "vm" {
 ## Architecture Decisions
 
 See [docs/decisions/](docs/decisions/) for ADRs.
+=======
+# idealism-as-code
+>>>>>>> bde5235f40d6d1ddf0aa0a31cc179baf0c16e88f
