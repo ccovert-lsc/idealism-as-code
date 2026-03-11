@@ -46,7 +46,7 @@ resource "proxmox_virtual_environment_vm" "this" {
 
 data "proxmox_virtual_environment_vms" "template" {
   filter {
-    attribute = "name"
-    value     = [var.template]
+    name   = "name"
+    values = [var.template]
   }
 }
