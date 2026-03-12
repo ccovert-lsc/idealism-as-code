@@ -1,0 +1,36 @@
+name: Validate modules
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    name: tofu validate + fmt
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: "1.11.5"
+
+      - name: Check formatting
+        run: |
+          find modules -name "*.tf" | head -1 | xargs dirname | sort -u | while read dir; do
+            echo "Checking fmt: $dir"
+            tofu fmt -check "$dir"
+          done
+
+      - name: Validate each module
+        run: |
+          for dir in modules/*/; do
+            echo "Validating: $dir"
+            cd "$dir"
+            tofu init -backend=false
+            tofu validate
+            cd "$GITHUB_WORKSPACE"
+          done
