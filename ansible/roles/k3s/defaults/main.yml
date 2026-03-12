@@ -1,0 +1,11 @@
+---
+k3s_version: stable
+k3s_role: server          # server | agent
+k3s_server_ip: ""         # required for agents; set in group_vars
+k3s_server_port: 6443
+
+# Server install flags
+k3s_server_extra_args: >-
+  --disable traefik
+  --disable servicelb
+  --write-kubeconfig-mode 644

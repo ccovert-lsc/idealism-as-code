@@ -1,0 +1,46 @@
+---
+- name: Download and run k3s server install script
+  ansible.builtin.shell:
+    cmd: >
+      curl -sfL https://get.k3s.io |
+      INSTALL_K3S_CHANNEL={{ k3s_version }}
+      sh -s - server
+      --node-ip {{ ansible_host }}
+      {{ k3s_server_extra_args }}
+    creates: /usr/local/bin/k3s
+
+- name: Wait for k3s server to be ready
+  ansible.builtin.wait_for:
+    path: /var/lib/rancher/k3s/server/node-token
+    timeout: 90
+
+- name: Wait for node to reach Ready state
+  ansible.builtin.shell: k3s kubectl get nodes --no-headers | grep -v NotReady
+  register: node_ready
+  until: node_ready.rc == 0
+  retries: 18
+  delay: 10
+
+- name: Read node token
+  ansible.builtin.slurp:
+    src: /var/lib/rancher/k3s/server/node-token
+  register: k3s_token_raw
+
+- name: Set token fact (available to subsequent plays via hostvars)
+  ansible.builtin.set_fact:
+    k3s_token: "{{ k3s_token_raw.content | b64decode | trim }}"
+
+- name: Fetch kubeconfig to mgmt-01
+  ansible.builtin.fetch:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: ~/.kube/lab.yaml
+    flat: true
+  become: true
+
+- name: Fix kubeconfig server address
+  ansible.builtin.replace:
+    path: ~/.kube/lab.yaml
+    regexp: 'https://127\.0\.0\.1:6443'
+    replace: "https://{{ ansible_host }}:6443"
+  delegate_to: localhost
+  become: false

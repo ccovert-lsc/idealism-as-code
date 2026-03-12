@@ -1,0 +1,21 @@
+---
+- name: Retrieve token from server
+  ansible.builtin.set_fact:
+    k3s_token: "{{ hostvars[groups['k3s_server'][0]]['k3s_token'] }}"
+
+- name: Download and run k3s agent install script
+  ansible.builtin.shell:
+    cmd: >
+      curl -sfL https://get.k3s.io |
+      INSTALL_K3S_CHANNEL={{ k3s_version }}
+      K3S_URL=https://{{ k3s_server_ip }}:{{ k3s_server_port }}
+      K3S_TOKEN={{ k3s_token }}
+      sh -s - agent
+      --node-ip {{ ansible_host }}
+    creates: /usr/local/bin/k3s
+
+- name: Wait for k3s agent service to start
+  ansible.builtin.systemd:
+    name: k3s-agent
+    state: started
+    enabled: true
