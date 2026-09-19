@@ -7,7 +7,7 @@ Backing material for blog content — every config here is real and inspectable.
 
 | Path | Purpose |
 |------|---------|
-| `docs/decisions/` | Architecture Decision Records (ADRs 0001–0014) — each one is a potential blog post |
+| `docs/decisions/` | Architecture Decision Records (ADRs 0001–0017) — each one is a potential blog post |
 | `docs/runbooks/` | Operational runbooks for common tasks |
 | `docs/cloud-dependencies.md` | External service inventory |
 | `modules/` | Reusable OpenTofu modules (no env-specific values) |
@@ -50,3 +50,6 @@ See [docs/decisions/](docs/decisions/) for the full ADR log.
 | [0012](docs/decisions/0012-local-registry-for-custom-images.md) | Local container registry for custom images |
 | [0013](docs/decisions/0013-mas-for-matrix-auth.md) | Matrix Authentication Service (MAS) |
 | [0014](docs/decisions/0014-kube-prometheus-stack-for-observability.md) | kube-prometheus-stack for observability |
+| [0015](docs/decisions/0015-livekit-cloud-for-matrix-video.md) | LiveKit Cloud for Matrix video calls |
+| [0016](docs/decisions/0016-nextcloud-for-files-and-calendar.md) | Nextcloud for files, calendar, and collaborative docs |
+| [0017](docs/decisions/0017-plane-for-project-management.md) | Plane for project management |
