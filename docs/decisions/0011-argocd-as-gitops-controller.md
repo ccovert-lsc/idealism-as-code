@@ -21,7 +21,7 @@ ArgoCD is bootstrapped manually on first deploy (via `scripts/setup-registry-arg
 
 ArgoCD is exposed publicly via Cloudflare Tunnel at `https://argocd.example.com` and gated behind Authentik SSO (OIDC).
 
-**Note:** In the current deployment, several apps are still applied via `kubectl apply` scripts rather than ArgoCD Applications. Migrating all apps to ArgoCD-managed is a planned improvement.
+**Update 2026-10-11:** the migration is complete. All apps — manifest-managed (via an AppProject + ApplicationSet watching `kubernetes/apps/*`) and Helm-sourced (via separate pinned multi-source Applications in `kubernetes/bootstrap/argocd-helm-apps.yaml`) — are ArgoCD-managed. See ADR-0007 for the upgrade process this enables.
 
 ## Consequences
 
@@ -29,6 +29,10 @@ ArgoCD is exposed publicly via Cloudflare Tunnel at `https://argocd.example.com`
 - ArgoCD UI provides a live view of cluster state, sync status, and resource health.
 - Self-hosted ArgoCD means the GitOps controller is inside the blast radius of a cluster failure — bootstrapping from scratch requires a manual `helm upgrade --install` step.
 - SSO via Authentik means ArgoCD admin access requires Authentik to be healthy.
+
+**Two operational gotchas found in practice, worth knowing before any Helm-sourced Application change:**
+- Applications defined under `kubernetes/bootstrap/` (the Helm-sourced ones, plus the AppProject/ApplicationSet themselves) are **not** watched by any app-of-apps. Pushing a spec change to git — including a chart `targetRevision` bump — does nothing to the live cluster by itself; it must be applied directly: `kubectl apply -f kubernetes/bootstrap/<file>.yaml`.
+- ArgoCD's repo-server caches the Helm chart repo index. Syncing right after bumping a pinned chart version can report `Synced Healthy Succeeded` instantly without the chart version actually changing — the sync silently no-ops. A `kubectl annotate application <name> -n argocd argocd.argoproj.io/refresh=hard --overwrite` before syncing is required, not optional, for a version bump to actually take effect. Always confirm against the real running image tag afterward, not `helm list` (which can show a stale revision indefinitely for an ArgoCD-managed Helm app — ArgoCD's multi-source rendering applies manifests directly rather than driving a tracked Helm release).
 
 ## Alternatives considered
 

@@ -15,27 +15,29 @@ We needed an upgrade script that:
 
 ## Decision
 
-All upgrade logic lives in `scripts/upgrade-apps.sh`. Sensitive values (database passwords, Matrix tokens) are read from k8s secrets at runtime via `kubectl get secret ... | base64 -d`, so the script contains no credentials and can be published in the public repository without modification.
+**Superseded 2026-10-11.** The original decision below (direct `helm upgrade` from `scripts/upgrade-apps.sh`) was written before the full migration to ArgoCD (ADR-0011). It is kept here for history; the actual process now splits in two:
 
-**Execution order is fixed:**
+**Helm-sourced ArgoCD Applications (ArgoCD, kube-prometheus-stack, Authentik)** go through git, never a direct `helm upgrade` from a workstation — that bypasses GitOps and creates drift between git and the live cluster:
 
-1. `helm repo update`
-2. Helm upgrades: ArgoCD → kube-prometheus-stack → Authentik (in parallel where safe, Authentik last because it has the strictest version constraints)
-3. Rollout-restart of manifest apps: low-risk apps first, then Synapse+MAS last
-4. 60-second stabilization wait
-5. Health check (`kubectl get pods -A`)
-6. Synapse well-known verification (`/.well-known/matrix/client`)
-7. Matrix notification to the alerts room
+1. Bump `targetRevision` in `kubernetes/bootstrap/argocd-helm-apps.yaml`, commit, push.
+2. Apply that file directly to the cluster: `kubectl apply -f kubernetes/bootstrap/argocd-helm-apps.yaml`. **This step is not optional** — Applications under `kubernetes/bootstrap/` are not watched by any app-of-apps, so pushing to git alone changes nothing live.
+3. Hard-refresh before syncing: `kubectl annotate application <name> -n argocd argocd.argoproj.io/refresh=hard --overwrite`. ArgoCD's repo-server caches the Helm chart repo index — a plain sync after a version bump can report `Synced Healthy` instantly without the chart version actually changing.
+4. Trigger the sync: `kubectl patch application <name> -n argocd --type merge -p '{"operation":{"sync":{"syncStrategy":{"hook":{}}}}}'`.
+5. Verify against the real running image tag (`kubectl get deploy <name> -o jsonpath='{.spec.template.spec.containers[0].image}'`), not `helm list` — ArgoCD's multi-source Helm rendering applies manifests directly rather than driving a tracked Helm release, so `helm list` can show a stale chart/revision indefinitely even after a real, successful upgrade.
+
+**Manifest-managed apps using `:latest`-style tags** still need an explicit `kubectl rollout restart` — ArgoCD being in sync doesn't force a fresh image pull if the manifest content itself hasn't changed. `scripts/upgrade-apps.sh` still handles this part: reading runtime secrets, restarting low-risk apps first and Synapse+MAS last, health-checking, and posting a summary to the Matrix alerts room.
 
 **Synapse and MAS are always restarted last.** They are tightly coupled — MAS handles all token issuance for Synapse — and new releases have historically shipped breaking config changes. Restarting them at the end limits blast radius.
 
 **Custom-image apps are excluded.** Apps whose images are built from source (e.g. AuNoo) require a separate build-and-push step before any restart. The upgrade script explicitly skips them and prints a reminder.
 
+**Worked example — the Authentik sequential upgrade (2026-10-11):** 2026.2.1 → 2026.2.3 → 2026.5.6 → 2026.8.3, one hop at a time via the git process above, with a verified `pg_dump -U authentik -d authentik -Fc` before every hop. Hop 2 hit a real breaking change: Authentik's internal default for `AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS` renders through the chart as a bracketed list literal (`"[0.0.0.0/0]"`), which the Rust-based config loader shipped in 2026.5.x rejects outright (`invalid IP address syntax`, crash-looping the worker before Django even starts). Fixed by setting it explicitly as a plain string in `authentik-values.yaml` (`trusted_proxy_cidrs: "10.42.0.0/16"`) — which also happened to satisfy 2026.8's stricter trusted-proxy header enforcement, so it needs to land before hop 2, not just before the final hop. See ADR-0010 and `scripts/upgrade-apps.sh`'s header comment for the full detail.
+
 ## Consequences
 
-- A single script handles the full upgrade cycle: run it from mgmt-01, watch the output, check the Matrix room.
-- No credentials in git history — the public repo script is identical to the private one except for placeholder URLs.
-- The Authentik major-version constraint (no skips allowed) must still be handled manually: inspect `helm list -n authentik` before running, pin an intermediate `--version` if needed.
+- Helm-sourced apps upgrade through an auditable git history; no more drift between what's declared and what's running.
+- The two ArgoCD-specific gotchas above (bootstrap Applications not auto-reconciled, chart-index caching) are easy to miss and will make an upgrade silently no-op — always verify against the real running image tag, never trust a bare `Synced` status or `helm list` alone.
+- The Authentik major-version constraint (no skips allowed) must still be handled manually: inspect the running image tag before starting, pin each intermediate chart version in turn.
 - If Synapse or MAS ships a breaking config change, the script will surface it via the health check and well-known probe, but recovery still requires manual diagnosis.
 
 ## Alternatives considered

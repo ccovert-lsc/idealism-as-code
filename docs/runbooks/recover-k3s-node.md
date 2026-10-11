@@ -79,8 +79,34 @@ If the underlying Proxmox host is unreachable (not just the k3s VM):
 3. Access the Proxmox host via a direct console (HDMI + keyboard) if SSH is unavailable
 4. After the Proxmox host is back, start the VM from the Proxmox UI:
    - `pvemain`: k3s-server-01 (VM 102)
-   - `pvesub1`: k3s-agent-01 (VM 103)
-   - `pvesub2`: k3s-agent-02 (VM 104)
+   - `pvesub1`: k3s-agent-01 (VM 104)
+   - `pvesub2`: k3s-agent-02 (VM 103)
+
+## 7 — Storage-level failure on the Proxmox host (ZFS / NVMe)
+
+A node can also fail at the storage layer while the VM itself looks fine at first — the VM freezes mid-operation (kubelet `PLEG` stops posting, `qm start`/`qm reset` hang), and the real problem is on the Proxmox host, not in the guest.
+
+**Signatures seen in practice:**
+- `zpool status -v` on the host reports the pool `SUSPENDED` (I/O timeout, device unresponsive) — `smartctl` can't even read the controller, but `lspci` still shows the device. This is a wedged-firmware state, not necessarily dead hardware.
+- A harder failure: the device disappears from the PCIe bus entirely (absent from `lspci`, never probed in `dmesg`). `zpool import -D` finds nothing at all, which looks catastrophic but is not necessarily unrecoverable.
+
+**The fix that actually works — and the one that doesn't:**
+A software/OS-level reboot (`systemctl reboot`, including the Proxmox UI's "Reboot" button) does **not** reliably force full PCIe re-enumeration on consumer-grade hardware. It can leave a wedged NVMe controller exactly as wedged as before. What does work is a true cold power-off — full de-energization, not a warm restart:
+
+```bash
+# From the Proxmox host's own shell (console or SSH):
+rtcwake -m off -s 300   # powers off, wakes itself after 300s — adjust as needed
+```
+
+Confirmed twice on this cluster's hardware (a DRAM-less MAXIO NVMe controller known to wedge under sustained write load): a soft reboot did nothing, `rtcwake`'s true power-off brought the pool back `ONLINE` immediately. Treat "reboot" and "power-cycle" as different operations on this hardware, not synonyms.
+
+**Reaching the Proxmox web UI with no LAN/IPMI access** (e.g. travelling, only Tailscale available): tunnel through any host that's already reachable over Tailscale and has a route to the Proxmox management network —
+```bash
+ssh -L 8006:<proxmox-host-ip>:8006 ubuntu@<tailscale-ip-of-some-other-reachable-host>
+```
+then browse `https://localhost:8006`. No inbound port needs to be opened on the home network, and it works entirely over an already-authenticated Tailscale session — safer and simpler than a router-level port-forward to the WAN.
+
+**Longer-term:** a single non-redundant or partially-understood disk is a real risk, not just an inconvenience — if a drive fails outright rather than just wedging, there is no copy. Mirroring and/or off-node backups for anything stored on `local-path` PVCs is the real fix; a power-cycle is a recovery tactic for a flaky drive, not a substitute for redundancy.
 
 ## Notes
 

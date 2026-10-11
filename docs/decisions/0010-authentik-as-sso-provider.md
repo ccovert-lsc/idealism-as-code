@@ -21,7 +21,15 @@ Each app gets a confidential OIDC client created in Authentik (Admin → Applica
 
 Authentik itself is exposed publicly via Cloudflare Tunnel at `https://id.example.com`.
 
-**Upgrade constraint:** Authentik blocks upgrades that skip a major version. The upgrade path is sequential: e.g. 2026.2.x → 2026.4.x → 2026.6.x → 2026.8.x. See `scripts/upgrade-apps.sh` for the procedure.
+**Upgrade constraint:** Authentik blocks upgrades that skip a major version. The upgrade path is sequential — confirmed real path on this cluster: 2026.2.1 → 2026.2.3 → 2026.5.6 → 2026.8.3. Each hop goes through git + ArgoCD (ADR-0007, ADR-0011), not a direct `helm upgrade`; see `scripts/upgrade-apps.sh`'s header comment for the full procedure.
+
+**Breaking change hit in practice (2026.5.x):** Authentik's internal default for `AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS` renders through the chart as a bracketed list literal (`"[0.0.0.0/0]"`). The Rust-based config loader shipped starting in 2026.5.x rejects that outright (`invalid IP address syntax`), crash-looping the worker before Django even starts — the old Python loader had tolerated it. Fix: set it explicitly as a plain string, not a YAML list, in `authentik-values.yaml`:
+```yaml
+authentik:
+  listen:
+    trusted_proxy_cidrs: "10.42.0.0/16"   # this cluster's pod CIDR
+```
+This also satisfies 2026.8's stricter enforcement of trusted-proxy-only `X-Forwarded-*` handling (needed for n8n's forward-auth), so set it before the 2026.5.x hop, not just before 2026.8.
 
 ## Consequences
 
@@ -29,7 +37,7 @@ Authentik itself is exposed publicly via Cloudflare Tunnel at `https://id.exampl
 - Authentik is a relatively complex app (server + worker + PostgreSQL + Redis). It is the most resource-intensive app in the cluster after Ollama.
 - If Authentik is down, SSO-gated apps fall back to local credentials — they are not fully unavailable.
 - Worker OOM is a known risk; the worker memory limit should be set to at least 1.5Gi (see `authentik-values.yaml`).
-- Sequential upgrade requirement means upgrades need planning — cannot just `helm upgrade` to latest blindly.
+- Sequential upgrade requirement means upgrades need planning — cannot just bump to the latest chart version blindly, and each hop needs its own `pg_dump` beforehand.
 
 ## Alternatives considered
 
